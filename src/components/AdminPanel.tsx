@@ -1911,7 +1911,7 @@ export default function AdminPanel() {
                           <td className="py-3 px-3 max-w-xs">
                             <div className="space-y-1 text-[10px]">
                               {b.matches.map((sm) => (
-                                <div key={sm.matchId} className="leading-tight">
+                                <div key={`${sm.matchId}_${sm.prediction}`} className="leading-tight">
                                   <span className="font-semibold text-gray-800">{sm.homeTeam}x{sm.awayTeam}</span>
                                   <span className="text-gray-400 ml-1">({sm.prediction})</span>
                                   <span className={`ml-1 px-1 font-bold rounded ${

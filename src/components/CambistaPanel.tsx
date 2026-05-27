@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Bet, UserProfile, Match } from "../types";
+import { Bet, UserProfile, Match, translatePrediction } from "../types";
 import { 
   getBets, 
   getMatches, 
@@ -532,7 +532,7 @@ export default function CambistaPanel() {
                         {/* Matches */}
                         <div className="space-y-1.5 mb-2">
                           {ticket.matches.map((m, idx) => {
-                            const predLabel = m.prediction === "home" ? "Casa" : m.prediction === "draw" ? "Empate" : "Fora";
+                            const predLabel = translatePrediction(m.prediction);
                             return (
                               <div key={idx} className="text-[10px] leading-tight text-gray-800 font-bold flex items-center justify-between">
                                 <span className="truncate max-w-[200px]">{m.homeTeam} x {m.awayTeam}</span>
@@ -655,9 +655,9 @@ export default function CambistaPanel() {
                     <td className="py-4 px-3 max-w-sm">
                       <div className="space-y-1">
                         {b.matches.map((sm) => (
-                          <div key={sm.matchId} className="text-[10px] leading-tight flex items-center gap-1.5 font-medium">
+                          <div key={`${sm.matchId}_${sm.prediction}`} className="text-[10px] leading-tight flex items-center gap-1.5 font-medium">
                             <span className="text-gray-800">{sm.homeTeam} x {sm.awayTeam}</span>
-                            <span className="text-gray-450">({sm.prediction === "home" ? "Casa" : sm.prediction === "draw" ? "Empate" : "Fora"})</span>
+                            <span className="text-gray-450">({translatePrediction(sm.prediction)})</span>
                             <span className={`px-1 rounded text-[8px] font-bold ${
                               sm.status === "won" ? "bg-emerald-50 text-emerald-700" : sm.status === "lost" ? "bg-rose-50 text-rose-700" : "bg-gray-100 text-gray-500"
                             }`}>

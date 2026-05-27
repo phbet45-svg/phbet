@@ -77,13 +77,20 @@ export default function PublicBetting({ isLiveOnly = false }: { isLiveOnly?: boo
   // Filter matches
   const filteredMatches = matches.filter(m => {
     // Live Filter
+    const [year, month, day] = m.date.split("-").map(Number);
+    const [hour, minute] = (m.time || "18:00").split(":").map(Number);
+    const gameTime = new Date(year, month - 1, day, hour, minute);
+    const now = new Date();
+    const hasStarted = now >= gameTime;
+
     if (isLiveOnly) {
-        const [hour, minute] = (m.time || "18:00").split(":").map(Number);
-        const gameTime = new Date(m.date);
-        gameTime.setHours(hour, minute);
-        const now = new Date();
-        const twoHoursLater = new Date(gameTime.getTime() + 2 * 60 * 60 * 1000);
-        return now >= gameTime && now <= twoHoursLater;
+        const twoHoursLater = new Date(gameTime.getTime() + 150 * 60 * 1000); // 2 hours 30 mins just in case
+        return hasStarted && now <= twoHoursLater;
+    } else {
+        // Normal pre-match view: hide games that have already started
+        if (hasStarted) {
+            return false;
+        }
     }
     
     // League Filter
@@ -93,10 +100,13 @@ export default function PublicBetting({ isLiveOnly = false }: { isLiveOnly?: boo
 
     // Date Filter
     const matchDateStr = m.date; // "yyyy-mm-dd"
-    const todayStr = new Date().toISOString().split("T")[0];
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const tomorrowStr = tomorrow.toISOString().split("T")[0];
+    
+    const localNow = new Date();
+    const todayStr = `${localNow.getFullYear()}-${String(localNow.getMonth() + 1).padStart(2, '0')}-${String(localNow.getDate()).padStart(2, '0')}`;
+    
+    const localTomorrow = new Date(localNow);
+    localTomorrow.setDate(localTomorrow.getDate() + 1);
+    const tomorrowStr = `${localTomorrow.getFullYear()}-${String(localTomorrow.getMonth() + 1).padStart(2, '0')}-${String(localTomorrow.getDate()).padStart(2, '0')}`;
 
     if (selectedDate === "today" && matchDateStr !== todayStr) {
       return false;
@@ -536,7 +546,7 @@ export default function PublicBetting({ isLiveOnly = false }: { isLiveOnly?: boo
             ) : (
               <div className="space-y-3 divide-y divide-gray-100 max-h-60 overflow-y-auto pr-1">
                 {items.map((item, idx) => (
-                  <div key={item.matchId} className={`pt-3 ${idx === 0 ? "pt-0" : ""}`}>
+                  <div key={`${item.matchId}_${item.prediction}`} className={`pt-3 ${idx === 0 ? "pt-0" : ""}`}>
                     <div className="flex justify-between items-start gap-2 text-xs">
                       <div className="flex-1 font-bold">
                         <span className="block text-gray-900 leading-snug">{item.homeTeam} x {item.awayTeam}</span>

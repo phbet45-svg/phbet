@@ -715,7 +715,7 @@ export default function TicketTracker({ ticketId, onBack }: TicketTrackerProps) 
                   };
 
                   return (
-                    <div key={m.matchId} className={`p-4 rounded-2xl transition-all duration-300 ${styleSet.matchRow}`}>
+                    <div key={`${m.matchId}_${m.prediction}`} className={`p-4 rounded-2xl transition-all duration-300 ${styleSet.matchRow}`}>
                       
                       {/* Flex grid of game layout */}
                       <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
