@@ -1,0 +1,132 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "Information about Admins, Cambistas, and Clientes",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "cambista", "cliente"] },
+        "status": { "type": "string", "enum": ["active", "blocked"] },
+        "commissionPercentage": { "type": "number" },
+        "balance": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "name", "role", "status"]
+    },
+    "Match": {
+      "title": "Sports Match",
+      "description": "Football or sports match available for betting",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "homeTeam": { "type": "string" },
+        "awayTeam": { "type": "string" },
+        "date": { "type": "string" },
+        "league": { "type": "string" },
+        "isActive": { "type": "boolean" },
+        "odds": {
+          "type": "object",
+          "properties": {
+            "homeWins": { "type": "number" },
+            "draw": { "type": "number" },
+            "awayWins": { "type": "number" }
+          }
+        },
+        "status": { "type": "string", "enum": ["pending", "finished", "cancelled"] },
+        "result": { "type": "string", "enum": ["home", "draw", "away"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "homeTeam", "awayTeam", "date", "league", "odds", "status"]
+    },
+    "Bet": {
+      "title": "Bet Slip Record",
+      "description": "Record of a placed multi/single bet slip",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "customerName": { "type": "string" },
+        "customerPhone": { "type": "string" },
+        "matches": {
+          "type": "array",
+          "items": { "type": "object" }
+        },
+        "totalOdd": { "type": "number" },
+        "stake": { "type": "number" },
+        "potentialPayout": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "won", "lost", "cancelled"] },
+        "cambistaId": { "type": "string" },
+        "commissionPercentage": { "type": "number" },
+        "commissionValue": { "type": "number" },
+        "commissionToken": { "type": "string" },
+        "commissionStatus": { "type": "string", "enum": ["pending", "validated", "cancelled"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "matches", "totalOdd", "stake", "potentialPayout", "status", "createdAt"]
+    },
+    "League": {
+      "title": "League / Championship",
+      "description": "Active or inactive soccer league",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "isActive": { "type": "boolean" }
+      },
+      "required": ["id", "name", "isActive"]
+    },
+    "SyncLog": {
+      "title": "API Sync Log",
+      "description": "Log entry tracking match synchronization",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "status": { "type": "string" },
+        "importedCount": { "type": "number" },
+        "details": { "type": "string" }
+      },
+      "required": ["id", "timestamp", "status"]
+    },
+    "SystemConfig": {
+      "title": "System General Config",
+      "description": "Admin system parameters",
+      "type": "object",
+      "properties": {
+        "houseMargin": { "type": "number" },
+        "apiUrl": { "type": "string" },
+        "apiKey": { "type": "string" }
+      }
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "Registered platform users"
+    },
+    "matches/{matchId}": {
+      "schema": { "$ref": "#/entities/Match" },
+      "description": "Sports matches"
+    },
+    "bets/{betId}": {
+      "schema": { "$ref": "#/entities/Bet" },
+      "description": "Bets placed by or via cambistas"
+    },
+    "leagues/{leagueId}": {
+      "schema": { "$ref": "#/entities/League" },
+      "description": "Sports leagues available"
+    },
+    "sync_logs/{logId}": {
+      "schema": { "$ref": "#/entities/SyncLog" },
+      "description": "Logs for sports API syncs"
+    },
+    "system_config/general": {
+      "schema": { "$ref": "#/entities/SystemConfig" },
+      "description": "Singleton configuration document"
+    }
+  }
+}

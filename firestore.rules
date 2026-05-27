@@ -1,0 +1,240 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net (Pillar 1)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Standard Helpers & Access Controls
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // Role Fetching Helpers
+    function getUserData(uid) {
+      return get(/databases/$(database)/documents/users/$(uid)).data;
+    }
+
+    // Helper to detect if database has not been seeded yet
+    function isUnseeded() {
+      return !exists(/databases/$(database)/documents/system_config/general);
+    }
+
+    // Bootstrapped Admin check (Pillar 3)
+    function isAdmin() {
+      return isSignedIn() && (
+        ("email" in request.auth.token && (
+          request.auth.token.email == "phbet45@gmail.com" ||
+          request.auth.token.email == "phbet@x.com" ||
+          request.auth.token.email == "ph@x.com"
+        )) ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin")
+      );
+    }
+
+    function isCambista() {
+      return isSignedIn() && 
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "cambista";
+    }
+
+    // STANDALONE DATA SCHEMAS VALIDATION HELPERS (Pillar 4 - Prevent Update Gap)
+    function isValidUserProfile(data) {
+      return data.uid is string && data.uid.size() <= 128 &&
+             data.name is string && data.name.size() <= 150 &&
+             data.email is string && data.email.size() <= 150 &&
+             data.phone is string && data.phone.size() <= 30 &&
+             data.role is string && (data.role == "admin" || data.role == "cambista" || data.role == "cliente") &&
+             data.status is string && (data.status == "active" || data.status == "blocked") &&
+             data.commissionPercentage is number && data.commissionPercentage >= 0 && data.commissionPercentage <= 100 &&
+             data.createdAt is string &&
+             (!("bankLimit" in data) || data.bankLimit is number);
+    }
+
+    function isValidMatch(data) {
+      return data.id is string && data.id.size() <= 128 &&
+             data.homeTeam is string && data.homeTeam.size() <= 150 &&
+             data.awayTeam is string && data.awayTeam.size() <= 150 &&
+             data.date is string && data.date.size() <= 50 &&
+             data.league is string && data.league.size() <= 150 &&
+             data.isActive is bool &&
+             data.odds is map &&
+             data.odds.homeWins is number && data.odds.homeWins > 0 &&
+             data.odds.draw is number && data.odds.draw > 0 &&
+             data.odds.awayWins is number && data.odds.awayWins > 0 &&
+             data.status is string && (data.status == "pending" || data.status == "finished" || data.status == "cancelled") &&
+             data.createdAt is string &&
+             (!("rawOdds" in data) || data.rawOdds is map) &&
+             (!("houseMarginOverride" in data) || data.houseMarginOverride is number) &&
+             (!("result" in data) || data.result == null || data.result is string) &&
+             (!("footballCorners" in data) || data.footballCorners == null || data.footballCorners is number) &&
+             (!("footballCards" in data) || data.footballCards == null || data.footballCards is number);
+    }
+
+    function isValidBet(data) {
+      return data.id is string && data.id.size() <= 128 &&
+             data.customerName is string && data.customerName.size() <= 150 &&
+             data.customerPhone is string && data.customerPhone.size() <= 50 &&
+             data.matches is list && data.matches.size() > 0 && data.matches.size() <= 30 &&
+             data.totalOdd is number && data.totalOdd > 0 &&
+             data.stake is number && data.stake > 0 && data.stake <= 10000 &&
+             data.potentialPayout is number && data.potentialPayout > 0 &&
+             data.status is string && (data.status == "pending" || data.status == "won" || data.status == "lost" || data.status == "cancelled" || data.status == "pendente_recuperacao" || data.status == "recuperada") &&
+             data.commissionStatus is string && (data.commissionStatus == "pending" || data.commissionStatus == "validated" || data.commissionStatus == "cancelled") &&
+             data.createdAt is string &&
+             data.pin is string && 
+             data.accepted is bool &&
+             (!("userId" in data) || data.userId == null || data.userId is string) &&
+             (!("cambistaId" in data) || data.cambistaId == null || data.cambistaId is string) &&
+             (!("commissionPercentage" in data) || data.commissionPercentage == null || data.commissionPercentage is number) &&
+             (!("commissionValue" in data) || data.commissionValue == null || data.commissionValue is number) &&
+             (!("commissionToken" in data) || data.commissionToken == null || data.commissionToken is string);
+    }
+
+    function isValidLeague(data) {
+      return data.id is string && data.id.size() <= 128 &&
+             data.name is string && data.name.size() <= 150 &&
+             data.isActive is bool;
+    }
+
+    function isValidSyncLog(data) {
+      return data.id is string && data.id.size() <= 128 &&
+             data.timestamp is string &&
+             data.status is string && (data.status == "success" || data.status == "warning" || data.status == "error") &&
+             data.importedCount is number &&
+             data.details is string && data.details.size() <= 2000;
+    }
+
+    function isValidSystemConfig(data) {
+      return data.houseMargin is number && data.houseMargin >= 0 && data.houseMargin <= 100 &&
+             data.apiUrl is string && data.apiUrl.size() <= 500 &&
+             data.apiKey is string && data.apiKey.size() <= 500 &&
+             (!("socialInstagram" in data) || data.socialInstagram is string) &&
+             (!("socialTelegram" in data) || data.socialTelegram is string) &&
+             (!("socialTwitter" in data) || data.socialTwitter is string) &&
+             (!("supportWhatsapp" in data) || data.supportWhatsapp is string) &&
+             (!("apiKeyTheOdds" in data) || data.apiKeyTheOdds is string) &&
+             (!("apiFootballKey" in data) || data.apiFootballKey is string) &&
+             (!("leagueMargins" in data) || data.leagueMargins is map);
+    }
+
+    // 1. USERS COLLECTION
+    match /users/{userId} {
+      // Allow get and list lookup queries for anyone
+      allow get, list: if true;
+      
+      // Admin has complete control (Pillar 5) or database is unseeded
+      allow create, update, delete: if isAdmin() || isUnseeded();
+      
+      // Standard users can sign up as "cliente" or "cambista" (Pillar 4)
+      allow create: if isSignedIn() && request.auth.uid == userId &&
+                    isValidUserProfile(incoming()) &&
+                    (incoming().role == "cliente" || incoming().role == "cambista") &&
+                    incoming().status == "active";
+                     
+      // Standard users can update PII (name, email, phone) but not protected fields
+      // And cambistas can update client metadata for betting totals (without changing protected fields)
+      allow update: if (isSignedIn() && request.auth.uid == userId &&
+                     isValidUserProfile(incoming()) &&
+                     !incoming().diff(existing()).affectedKeys().hasAny(["role", "commissionPercentage", "status", "createdAt", "bankLimit"]) &&
+                     incoming().status == "active") ||
+                    (isCambista() && existing().role == "cliente" &&
+                     !incoming().diff(existing()).affectedKeys().hasAny(["uid", "name", "email", "phone", "role", "status", "commissionPercentage", "createdAt", "bankLimit", "password"]));
+    }
+
+    // 2. MATCHES COLLECTION
+    match /matches/{matchId} {
+      allow get, list: if true;
+      allow write: if isUnseeded() || isAdmin();
+    }
+
+    // 3. LEAGUES COLLECTION
+    match /leagues/{leagueId} {
+      allow get, list: if true;
+      allow write: if isUnseeded() || (isAdmin() && isValidLeague(incoming()));
+    }
+
+    // 4. BETS COLLECTION
+    match /bets/{betId} {
+      // Allow anybody to get a single bet for direct tracking link lookup
+      allow get: if true;
+      
+      // List rules: enforce query filters matching the allowed fields
+      allow list: if isAdmin() || 
+                    (isSignedIn() && resource.data.userId == request.auth.uid) ||
+                    (isSignedIn() && resource.data.cambistaId == request.auth.uid) ||
+                    (resource.data.pin != null) ||
+                    (isCambista() && resource.data.customerPhone != null);
+      
+      // Admin can update or delete
+      // Cambista can claim/recover a bet if its status is "pendente_recuperacao" and they are claiming it
+      // Allow cambista to accept a pending bet if it's currently unassigned.
+      // Allow cambista to cancel their own bet.
+      allow update: if isAdmin() || 
+                    (isSignedIn() && (
+                      resource.data.cambistaId == request.auth.uid || 
+                      resource.data.userId == request.auth.uid ||
+                      (isCambista() && resource.data.status == "pendente_recuperacao" && incoming().status == "recuperada" && incoming().cambistaId == request.auth.uid) ||
+                      (isCambista() && resource.data.cambistaId == null && resource.data.status == "pending") ||
+                      (isCambista() && resource.data.cambistaId == request.auth.uid && incoming().status == "cancelled" && incoming().commissionStatus == "cancelled")
+                    ));
+      allow delete: if isAdmin();
+      
+      // Placed bet rules (Pillar 4/7)
+      // Allow guests/clients to create bets
+      allow create: if isValidBet(incoming()) && (
+                      isAdmin() ||
+                      // Guest placing
+                      (!isSignedIn() && incoming().userId == null) ||
+                      // Client placing directly
+                      (isSignedIn() && incoming().userId == request.auth.uid) ||
+                      // Cambista placing on behalf
+                      (isSignedIn() && incoming().cambistaId == request.auth.uid)
+                    ) && 
+                    incoming().id == betId && 
+                    (incoming().status == "pending" || incoming().status == "pendente_recuperacao") &&
+                    incoming().accepted == false;
+    }
+
+    // 5. SYNC LOGS COLLECTION
+    match /sync_logs/{logId} {
+      allow read, list: if isAdmin();
+      allow write: if isAdmin() && isValidSyncLog(incoming());
+    }
+
+    // 6. SYSTEM CONFIG SINGLETON
+    match /system_config/{configId} {
+      allow read: if true;
+      allow write: if isUnseeded() || (isAdmin() && isValidSystemConfig(incoming()));
+    }
+
+    // 7. RECOVERY LOGS COLLECTION
+    match /recovery_logs/{logId} {
+      allow read, list: if isAdmin() || (isSignedIn() && resource.data.cambistaId == request.auth.uid);
+      allow create: if isCambista() && incoming().cambistaId == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
+
+    // 8. TRANSACTIONS COLLECTION
+    match /transactions/{transactionId} {
+      allow read, list: if isAdmin() || (isSignedIn() && (resource.data.cambistaId == request.auth.uid || resource.data.userId == request.auth.uid));
+      allow create: if isSignedIn() && (incoming().userId == request.auth.uid || incoming().cambistaId == request.auth.uid || isAdmin());
+      allow update, delete: if isAdmin();
+    }
+  }
+}
