@@ -89,7 +89,6 @@ function AppContent() {
       {/* Main Container with dynamic tab loading */}
       <main className="flex-1 pb-16">
         {currentTab === "sports" && <PublicBetting />}
-        {currentTab === "live" && <PublicBetting isLiveOnly />}
         {currentTab === "admin" && <AdminPanel />}
         {currentTab === "cambista" && <CambistaPanel />}
       </main>

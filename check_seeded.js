@@ -8,5 +8,8 @@ const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 async function check() {
   const d = await getDoc(doc(db, "system_config", "general"));
   console.log("Exists:", d.exists());
+  if (d.exists()) {
+    console.log("Config Data:", JSON.stringify(d.data(), null, 2));
+  }
 }
 check();

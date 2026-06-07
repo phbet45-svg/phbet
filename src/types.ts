@@ -40,8 +40,13 @@ export interface Match {
   awayTeam: string;
   date: string; // e.g. "2026-05-26"
   time?: string; // e.g. "18:00"
+  minute?: string; // e.g. "45'"
+  score?: string; // e.g. "2 - 1"
+  logoHome?: string; // e.g. "⚫🔴"
+  logoAway?: string; // e.g. "⚪🔴"
   league: string; // league name, e.g., "Serie A"
   isActive: boolean;
+  rawStatus?: string; // e.g. "live", "today", "tomorrow", "finished"
   odds: MatchOdds;
   rawOdds?: MatchOdds; // Original API odds before margin was applied
   houseMarginOverride?: number; // Override margin for this specific game
@@ -100,6 +105,8 @@ export interface SystemConfig {
   apiKeyTheOdds?: string;
   apiFootballKey?: string;
   leagueMargins?: Record<string, number>; // Custom margin per league/competition
+  betBuilderDiscount?: number; // e.g., 20 for 20% discount
+  sproAgencyEnabled?: boolean;
 }
 
 export function translatePrediction(prediction: string): string {

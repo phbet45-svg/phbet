@@ -78,6 +78,9 @@ export default function AdminPanel() {
   const [overrideAwayOdd, setOverrideAwayOdd] = useState(3.0);
   const [overrideMatchMargin, setOverrideMatchMargin] = useState<number>(10);
 
+  // Bet Builder
+  const [betBuilderDiscount, setBetBuilderDiscount] = useState(20);
+
   // Margino configuration fields
   const [houseMarginInput, setHouseMarginInput] = useState(10);
   const [leagueMargins, setLeagueMargins] = useState<Record<string, number>>({});
@@ -139,6 +142,7 @@ export default function AdminPanel() {
       setApiKeyTheOdds(config.apiKeyTheOdds || "");
       setApiFootballKey(config.apiFootballKey || "");
       setLeagueMargins(config.leagueMargins || {});
+      setBetBuilderDiscount(config.betBuilderDiscount || 20);
     } catch (err) {
       console.error("Failed to refresh admin panel collections", err);
     }
@@ -1463,6 +1467,22 @@ export default function AdminPanel() {
                       <span className="font-extrabold text-[#007BFF] text-base w-10 shrink-0">{houseMarginInput}%</span>
                     </div>
                   </div>
+
+                  <div>
+                    <label className="block text-[10px] font-black text-gray-500 uppercase mb-2">Desconto Bet Builder (%)</label>
+                    <div className="flex items-center gap-4">
+                      <input
+                        type="range"
+                        min="0"
+                        max="50"
+                        step="1"
+                        value={betBuilderDiscount}
+                        onChange={(e) => setBetBuilderDiscount(parseInt(e.target.value) || 0)}
+                        className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-emerald-600"
+                      />
+                      <span className="font-extrabold text-emerald-600 text-base w-10 shrink-0">{betBuilderDiscount}%</span>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -1472,7 +1492,8 @@ export default function AdminPanel() {
                     try {
                       await saveSystemConfig({
                         ...systemConfig,
-                        houseMargin: houseMarginInput
+                        houseMargin: houseMarginInput,
+                        betBuilderDiscount: betBuilderDiscount
                       });
                       
                       // Dynamic update odds
@@ -2115,6 +2136,28 @@ export default function AdminPanel() {
                 Salvar Configurações Gerais
               </button>
             </form>
+
+            {/* Danger Zone */}
+            <div className="pt-8 mt-8 border-t border-gray-100">
+              <h3 className="text-sm font-black text-rose-900 mb-2 uppercase tracking-wider flex items-center gap-2">
+                 <AlertCircle className="h-4 w-4" /> Zona de Perigo
+              </h3>
+              <p className="text-[10px] text-rose-600 mb-3">
+                Esta ação apagará <strong>todos</strong> os jogos e <strong>todas</strong> as apostas. Irreversível.
+              </p>
+              <button
+                onClick={async () => {
+                  if (confirm("TEM CERTEZA? APAGAR TODOS OS JOGOS E APOSTAS?")) {
+                    await adminResetEverything();
+                    refreshAllData();
+                    alert("Dados limpos com sucesso.");
+                  }
+                }}
+                className="w-full bg-rose-600 hover:bg-rose-700 text-white font-black text-xs px-4 py-2.5 rounded-xl transition cursor-pointer"
+              >
+                APAGAR TUDO (Jogos + Apostas)
+              </button>
+            </div>
           </div>
 
           {/* Sync Trigger and Logs */}

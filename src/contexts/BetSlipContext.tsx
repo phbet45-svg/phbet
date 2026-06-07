@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { SelectedBetMatch, Bet, Match } from "../types";
 import { useAuth } from "./AuthContext";
-import { placeBet, generateCommissionToken, getUserProfile, getBetsByCambista } from "../lib/dbService";
+import { placeBet, generateCommissionToken, getUserProfile, getBetsByCambista, getSystemConfig } from "../lib/dbService";
 
 interface BetSlipContextType {
   items: SelectedBetMatch[];
@@ -34,12 +34,27 @@ export function BetSlipProvider({ children }: { children: React.ReactNode }) {
   const { currentUser, userProfile, isCliente, isCambista } = useAuth();
   const [items, setItems] = useState<SelectedBetMatch[]>([]);
   const [stake, setStake] = useState<number>(10);
+  const [betBuilderDiscount, setBetBuilderDiscount] = useState(20);
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [selectedCambistaId, setSelectedCambistaId] = useState("");
 
+  useEffect(() => {
+    async function loadConfig() {
+      const config = await getSystemConfig();
+      if (config.betBuilderDiscount !== undefined) {
+        setBetBuilderDiscount(config.betBuilderDiscount);
+      }
+    }
+    loadConfig();
+  }, []);
+
+  const hasWinner = items.some(item => getMarketGroup(item.prediction) === 'winner');
+  const hasOthers = items.some(item => ['corners', 'cards'].includes(getMarketGroup(item.prediction)));
+  
+  const rawTotalOdds = items.reduce((acc, item) => acc * item.odd, 1);
   const totalOdds = parseFloat(
-    items.reduce((acc, item) => acc * item.odd, 1).toFixed(2)
+    (hasWinner && hasOthers ? rawTotalOdds * (1 - betBuilderDiscount / 100) : rawTotalOdds).toFixed(2)
   );
   
   // Max payout capped at R$ 10.000,00

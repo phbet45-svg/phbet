@@ -1,6 +1,6 @@
 import React from "react";
 import { useAuth } from "../contexts/AuthContext";
-import { Coins, User, LogOut, ShieldAlert, BadgePercent, Landmark, Activity } from "lucide-react";
+import { Coins, User, LogOut, ShieldAlert, BadgePercent, Landmark, Activity, Sparkles } from "lucide-react";
 
 interface HeaderProps {
   onOpenLogin: () => void;
@@ -31,25 +31,14 @@ export default function Header({ onOpenLogin, currentTab, onChangeTab }: HeaderP
         <nav className="flex items-center gap-1 bg-gray-100 p-1.5 rounded-full border border-gray-200 shadow-inner">
           <button
             onClick={() => onChangeTab("sports")}
-            className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${
+            className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 ${
               currentTab === "sports"
                 ? "bg-[#007BFF] text-white shadow-sm"
                 : "text-gray-600 hover:text-[#007BFF] hover:bg-white"
             }`}
           >
-            ⚽ Esportes
-          </button>
-
-          <button
-            onClick={() => onChangeTab("live")}
-            className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 animate-pulse ${
-              currentTab === "live"
-                ? "bg-red-600 text-white shadow-sm"
-                : "bg-red-50 text-red-600 hover:bg-red-100"
-            }`}
-          >
-            <Activity className="h-3.5 w-3.5" />
-            AO VIVO
+            <span className="text-red-500 animate-pulse text-xs leading-none">🔴</span>
+            <span>Esportes AO VIVO</span>
           </button>
 
           {userProfile?.role === "admin" && (
