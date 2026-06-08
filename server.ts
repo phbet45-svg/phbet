@@ -2,7 +2,6 @@ import { initBettingWs } from "./src/lib/bettingWsService";
 import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
-import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 import multer from "multer";
 
@@ -1831,6 +1830,11 @@ app.post("/api/chat-assistant", async (req, res) => {
     return res.status(400).json({ error: "Campo 'messages' é obrigatório e deve ser uma lista." });
   }
 
+  // Resolve dynamic baseUrl for loopback requests (important for Vercel)
+  const protocol = req.secure || req.headers["x-forwarded-proto"] === "https" ? "https" : "http";
+  const host = req.get("host") || `localhost:${PORT}`;
+  const baseUrl = `${protocol}://${host}`;
+
   // Validate Gemini Client
   const geminiApiKey = process.env.GEMINI_API_KEY || "";
   const activeAi = geminiApiKey ? new GoogleGenAI({
@@ -1917,31 +1921,31 @@ app.post("/api/chat-assistant", async (req, res) => {
         let result: any = null;
         try {
           if (fc.name === "listLiveMatches") {
-            const fetchRes = await fetch(`http://localhost:${PORT}/api/live`);
+            const fetchRes = await fetch(`${baseUrl}/api/live`);
             result = await fetchRes.json();
           } else if (fc.name === "listUpcomingMatches") {
             const date = fc.args?.date || "";
             const league = fc.args?.league || "";
-            const fetchRes = await fetch(`http://localhost:${PORT}/api/fixtures?date=${encodeURIComponent(date)}&league=${encodeURIComponent(league)}`);
+            const fetchRes = await fetch(`${baseUrl}/api/fixtures?date=${encodeURIComponent(date)}&league=${encodeURIComponent(league)}`);
             result = await fetchRes.json();
           } else if (fc.name === "getMatchStatistics") {
             const matchId = fc.args?.matchId || "";
-            const fetchRes = await fetch(`http://localhost:${PORT}/api/statistics?match_id=${encodeURIComponent(matchId)}`);
+            const fetchRes = await fetch(`${baseUrl}/api/statistics?match_id=${encodeURIComponent(matchId)}`);
             result = await fetchRes.json();
           } else if (fc.name === "getLeagueStandings") {
             const leagueId = fc.args?.leagueId || "";
-            const fetchRes = await fetch(`http://localhost:${PORT}/api/standings?league_id=${encodeURIComponent(leagueId)}`);
+            const fetchRes = await fetch(`${baseUrl}/api/standings?league_id=${encodeURIComponent(leagueId)}`);
             result = await fetchRes.json();
           } else if (fc.name === "getMatchDetailsAndOdds") {
             const matchId = fc.args?.matchId || "";
-            const fetchRes = await fetch(`http://localhost:${PORT}/api/odds?match_id=${encodeURIComponent(matchId)}`);
+            const fetchRes = await fetch(`${baseUrl}/api/odds?match_id=${encodeURIComponent(matchId)}`);
             result = await fetchRes.json();
           } else if (fc.name === "getLeagues") {
-            const fetchRes = await fetch(`http://localhost:${PORT}/api/leagues`);
+            const fetchRes = await fetch(`${baseUrl}/api/leagues`);
             result = await fetchRes.json();
           } else if (fc.name === "getTeams") {
             const query = fc.args?.searchQuery || "";
-            const fetchRes = await fetch(`http://localhost:${PORT}/api/teams?q=${encodeURIComponent(query)}`);
+            const fetchRes = await fetch(`${baseUrl}/api/teams?q=${encodeURIComponent(query)}`);
             result = await fetchRes.json();
           }
         } catch (err: any) {
@@ -1987,6 +1991,7 @@ app.post("/api/chat-assistant", async (req, res) => {
 async function startServer() {
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
@@ -2016,4 +2021,9 @@ async function startServer() {
   });
 }
 
-startServer();
+// Only start Express listener if not running in modular/serverless environment (like Vercel)
+if (!process.env.VERCEL) {
+  startServer();
+}
+
+export default app;
