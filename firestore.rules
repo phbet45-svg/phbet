@@ -130,6 +130,7 @@ service cloud.firestore {
              (!("supportWhatsapp" in data) || data.supportWhatsapp is string) &&
              (!("apiKeyTheOdds" in data) || data.apiKeyTheOdds is string) &&
              (!("apiFootballKey" in data) || data.apiFootballKey is string) &&
+             (!("footballDataToken" in data) || data.footballDataToken is string) &&
              (!("leagueMargins" in data) || data.leagueMargins is map);
     }
 

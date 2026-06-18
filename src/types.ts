@@ -104,6 +104,7 @@ export interface SystemConfig {
   supportWhatsapp?: string;
   apiKeyTheOdds?: string;
   apiFootballKey?: string;
+  footballDataToken?: string;
   leagueMargins?: Record<string, number>; // Custom margin per league/competition
   betBuilderDiscount?: number; // e.g., 20 for 20% discount
   sproAgencyEnabled?: boolean;

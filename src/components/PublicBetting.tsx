@@ -558,11 +558,19 @@ export default function PublicBetting({ isLiveOnly = false }: { isLiveOnly?: boo
                         <div className="flex-1 flex items-center justify-between gap-4">
                           <div className="space-y-2.5">
                             <div className="flex items-center gap-2 text-[15px] text-gray-900 font-black tracking-tight">
-                              <span className="text-sm inline-block shrink-0">{match.logoHome || "⚽"}</span>
+                              {match.logoHome && (String(match.logoHome).startsWith("http") || String(match.logoHome).startsWith("/")) ? (
+                                <img src={match.logoHome} className="w-5 h-5 object-contain shrink-0" alt="Home logo" referrerPolicy="no-referrer" />
+                              ) : (
+                                <span className="text-sm inline-block shrink-0">{match.logoHome || "⚽"}</span>
+                              )}
                               <span>{match.homeTeam}</span>
                             </div>
                             <div className="flex items-center gap-2 text-[15px] text-gray-900 font-black tracking-tight">
-                              <span className="text-sm inline-block shrink-0">{match.logoAway || "⚽"}</span>
+                              {match.logoAway && (String(match.logoAway).startsWith("http") || String(match.logoAway).startsWith("/")) ? (
+                                <img src={match.logoAway} className="w-5 h-5 object-contain shrink-0" alt="Away logo" referrerPolicy="no-referrer" />
+                              ) : (
+                                <span className="text-sm inline-block shrink-0">{match.logoAway || "⚽"}</span>
+                              )}
                               <span>{match.awayTeam}</span>
                             </div>
                           </div>

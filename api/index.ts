@@ -1,3 +1,6 @@
-import app from "../server";
+// @ts-ignore
+import server from "../dist/server.cjs";
 
-export default app;
+const handler = (server as any).default || server;
+
+export default handler;

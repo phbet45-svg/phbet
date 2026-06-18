@@ -530,6 +530,21 @@ export async function saveLeague(league: League): Promise<void> {
 // SYSTEM CONFIG SERVICES
 // ==========================================
 
+
+const isDummyKey = (key?: string): boolean => {
+  if (!key) return true;
+  const k = key.toUpperCase();
+  return (
+    k.includes("FREE-KEY") ||
+    k.includes("PLACEHOLDER") ||
+    k.includes("YOUR_") ||
+    k.includes("YOUR-KEY") ||
+    k.includes("MY-KEY") ||
+    k.includes("KEY_HERE") ||
+    k.length < 5
+  );
+};
+
 export async function getSystemConfig(): Promise<SystemConfig> {
   if (isMockEnvironment) {
     const docData = getMockDoc<SystemConfig>(KEYS.SYSTEM_CONFIG);
@@ -542,7 +557,12 @@ export async function getSystemConfig(): Promise<SystemConfig> {
     const ref = doc(db, "system_config", "general");
     const snap = await getDoc(ref);
     if (snap.exists()) {
-      return snap.data() as SystemConfig;
+      const config = snap.data() as SystemConfig;
+      if (isDummyKey(config.apiKey)) config.apiKey = "";
+      if (isDummyKey(config.apiKeyTheOdds)) config.apiKeyTheOdds = "";
+      if (isDummyKey(config.apiFootballKey)) config.apiFootballKey = "";
+      if (isDummyKey(config.footballDataToken)) config.footballDataToken = "";
+      return config;
     }
     return { houseMargin: 10, apiUrl: "", apiKey: "" };
   } catch (error) {
@@ -557,6 +577,12 @@ export async function saveSystemConfig(config: SystemConfig): Promise<void> {
     return;
   }
   
+  // Clean dummy keys before saving
+  if (isDummyKey(config.apiKey)) config.apiKey = "";
+  if (isDummyKey(config.apiKeyTheOdds)) config.apiKeyTheOdds = "";
+  if (isDummyKey(config.apiFootballKey)) config.apiFootballKey = "";
+  if (isDummyKey(config.footballDataToken)) config.footballDataToken = "";
+
   const path = "system_config/general";
   try {
     const ref = doc(db, "system_config", "general");
@@ -650,7 +676,7 @@ export async function triggerSportsApiSync(): Promise<{ success: boolean; count:
   let isRealSync = false;
   let syncDetails = "";
 
-  if (!isMockEnvironment && (config.apiKeyTheOdds || config.apiFootballKey || config.apiKey)) {
+  if (!isMockEnvironment && (config.apiKeyTheOdds || config.apiFootballKey || config.apiKey || config.footballDataToken)) {
     try {
       const res = await fetch("/api/sync-real-matches", {
         method: "POST",
@@ -658,7 +684,8 @@ export async function triggerSportsApiSync(): Promise<{ success: boolean; count:
         body: JSON.stringify({
           apiKeyTheOdds: config.apiKeyTheOdds,
           apiFootballKey: config.apiFootballKey,
-          apiKey: config.apiKey
+          apiKey: config.apiKey,
+          footballDataToken: config.footballDataToken
         })
       });
 

@@ -95,6 +95,7 @@ export default function AdminPanel() {
   const [supportWhatsapp, setSupportWhatsapp] = useState("");
   const [apiKeyTheOdds, setApiKeyTheOdds] = useState("");
   const [apiFootballKey, setApiFootballKey] = useState("");
+  const [footballDataToken, setFootballDataToken] = useState("");
 
   // Financial Filters
   const [startDateFilter, setStartDateFilter] = useState("");
@@ -141,6 +142,7 @@ export default function AdminPanel() {
       setSupportWhatsapp(config.supportWhatsapp || "");
       setApiKeyTheOdds(config.apiKeyTheOdds || "");
       setApiFootballKey(config.apiFootballKey || "");
+      setFootballDataToken(config.footballDataToken || "");
       setLeagueMargins(config.leagueMargins || {});
       setBetBuilderDiscount(config.betBuilderDiscount || 20);
     } catch (err) {
@@ -570,6 +572,7 @@ export default function AdminPanel() {
         supportWhatsapp,
         apiKeyTheOdds,
         apiFootballKey,
+        footballDataToken,
         leagueMargins
       });
       setConfigMsg({ type: "success", text: "Configurações gerais atualizadas com sucesso!" });
@@ -2118,12 +2121,22 @@ export default function AdminPanel() {
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">API-Football Key (Football-Data)</label>
+                  <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">API-Football Key</label>
                   <input
                     type="password"
                     value={apiFootballKey}
                     onChange={(e) => setApiFootballKey(e.target.value)}
                     placeholder="Chave para API-Football"
+                    className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 text-xs text-gray-800 font-mono font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Football-Data.org Token (v4/matches)</label>
+                  <input
+                    type="password"
+                    value={footballDataToken}
+                    onChange={(e) => setFootballDataToken(e.target.value)}
+                    placeholder="Token de Autenticação X-Auth-Token"
                     className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 text-xs text-gray-800 font-mono font-bold"
                   />
                 </div>

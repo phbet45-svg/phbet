@@ -101,6 +101,23 @@ app.post("/api/parse-games", upload.single("image"), async (req, res) => {
   }
 });
 
+// API: Fetch World Cup 2026 Matches (Proxy)
+app.get("/api/world-cup-matches", async (req, res) => {
+  const token = process.env.FOOTBALL_DATA_API_KEY;
+  if (!token) {
+    return res.status(500).json({ error: "API Key not configured" });
+  }
+  try {
+    const response = await fetch("https://api.football-data.org/v4/competitions/WC/matches", {
+      headers: { "X-Auth-Token": token }
+    });
+    const data = await response.json();
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch matches" });
+  }
+});
+
 // API: Parse Games from Image (Base64 URL)
 app.post("/api/parse-games-base64", async (req, res) => {
   const { base64 } = req.body;
@@ -151,30 +168,66 @@ app.post("/api/parse-games-url", async (req, res) => {
   }
 });
 
-// API: Sync Matches from external sources (TheOdds API / API-Football)
+// API: Sync Matches from external sources (TheOdds API / API-Football / Football-Data)
 app.post("/api/sync-real-matches", async (req, res) => {
-  let { apiKeyTheOdds, apiFootballKey, apiKey } = req.body;
+  let { apiKeyTheOdds, apiFootballKey, apiKey, footballDataToken } = req.body;
   
   // Trim spaces, tabs, and newlines from all key properties to prevent copy-paste spacing 401s
   apiKeyTheOdds = (apiKeyTheOdds || "").replace(/\s/g, "");
   apiFootballKey = (apiFootballKey || "").replace(/\s/g, "");
   apiKey = (apiKey || "").replace(/\s/g, "");
+  footballDataToken = (footballDataToken || "").replace(/\s/g, "");
+
+  const isDummyKey = (key: string): boolean => {
+    if (!key) return true;
+    const k = key.toUpperCase();
+    return (
+      k.includes("FREE-KEY") ||
+      k.includes("PLACEHOLDER") ||
+      k.includes("YOUR_") ||
+      k.includes("YOUR-KEY") ||
+      k.includes("MY-KEY") ||
+      k.includes("KEY_HERE") ||
+      k.length < 5
+    );
+  };
+
+  // Convert dummy/mock keys to blank values so we don't attempt live calls with placeholder keys
+  if (isDummyKey(apiKeyTheOdds)) apiKeyTheOdds = "";
+  if (isDummyKey(apiFootballKey)) apiFootballKey = "";
+  if (isDummyKey(apiKey)) apiKey = "";
+  if (isDummyKey(footballDataToken)) footballDataToken = "";
+
+  // Update server state of configured keys
+  if (apiKeyTheOdds) lastConfiguredKeys.apiKeyTheOdds = apiKeyTheOdds;
+  if (apiFootballKey) lastConfiguredKeys.apiFootballKey = apiFootballKey;
+  if (apiKey) lastConfiguredKeys.apiKey = apiKey;
+  if (footballDataToken) lastConfiguredKeys.footballDataToken = footballDataToken;
 
   // intelligent Fallbacks: If specific provider keys are blank but main Secret key is defined,
-  // use the main Secret key for both services.
+  // use the main Secret key for all services.
   if (!apiKeyTheOdds && apiKey) {
     apiKeyTheOdds = apiKey;
   }
   if (!apiFootballKey && apiKey) {
     apiFootballKey = apiKey;
   }
+  if (!footballDataToken && apiKey) {
+    footballDataToken = apiKey;
+  }
 
-  if (!apiKeyTheOdds && !apiFootballKey) {
-    return res.status(400).json({ error: "Nenhuma chave de API (TheOdds ou API-Football) configurada. Vá em configurações e salve as suas chaves." });
+  const logs: string[] = [];
+
+  if (!apiKeyTheOdds && !apiFootballKey && !footballDataToken) {
+    logs.push("Nenhuma chave real e válida configurada (apenas chaves de teste ou nulas detectadas). Operando em modo SIMULAÇÃO.");
+    return res.json({
+      success: true,
+      matches: [],
+      logs: logs.join("\n")
+    });
   }
 
   const matches: any[] = [];
-  const logs: string[] = [];
 
   // 1. Process TheOdds API
   if (apiKeyTheOdds) {
@@ -389,6 +442,58 @@ app.post("/api/sync-real-matches", async (req, res) => {
     } catch (err: any) {
       console.warn("Erro geral na sincronização do API-Football:", err.message || String(err));
       logs.push(`Erro geral API-Football: ${err.message || String(err)}`);
+    }
+  }
+
+  // 3. Process Football-Data.org API
+  if (footballDataToken) {
+    logs.push(`Iniciando sincronização via Football-Data.org API com chave [comprimento: ${footballDataToken.length}]...`);
+    try {
+      const fdMatches = await fetchFootballDataMatches(footballDataToken);
+      if (fdMatches && fdMatches.length > 0) {
+        logs.push(`Sincronização via Football-Data.org realizada com sucesso! Retornados ${fdMatches.length} jogos.`);
+        for (const m of fdMatches) {
+          const alreadyImported = matches.some(em => 
+            em.id === m.id || 
+            ((em.homeTeam.toLowerCase() === m.homeTeam.toLowerCase() || em.awayTeam.toLowerCase() === m.awayTeam.toLowerCase()) && em.date === m.date)
+          );
+          if (!alreadyImported) {
+            matches.push({
+              id: m.id,
+              homeTeam: m.homeTeam,
+              awayTeam: m.awayTeam,
+              date: m.date,
+              time: m.time,
+              league: m.league,
+              isActive: true,
+              odds: {
+                homeWins: m.odds.home,
+                draw: m.odds.draw,
+                awayWins: m.odds.away,
+                over95_corners: m.odds.over25 || 1.85,
+                under95_corners: m.odds.under25 || 1.85
+              },
+              rawOdds: {
+                homeWins: m.odds.home,
+                draw: m.odds.draw,
+                awayWins: m.odds.away,
+                over95_corners: m.odds.over25 || 1.85,
+                under95_corners: m.odds.under25 || 1.85
+              },
+              status: m.status === "finished" ? "finished" : "pending",
+              result: m.score ? (m.score.winner === "HOME_TEAM" ? "home" : m.score.winner === "DRAW" ? "draw" : "away") : null,
+              logoHome: m.logoHome,
+              logoAway: m.logoAway,
+              createdAt: new Date().toISOString()
+            });
+          }
+        }
+      } else {
+        logs.push("Nenhuma partida pôde ser sincronizada no momento com a chave Football-Data.org.");
+      }
+    } catch (err: any) {
+      console.warn("Erro ao sincronizar Football-Data no endpoint manual:", err.message || String(err));
+      logs.push(`Erro Football-Data: ${err.message || String(err)}`);
     }
   }
 
@@ -823,6 +928,10 @@ function generateFullMatchesList(): any[] {
       time = "21:30";
     }
 
+    const todayStr = now.toISOString().split("T")[0];
+    const tomorrowStr = new Date(now.getTime() + 86400000).toISOString().split("T")[0];
+    const matchDate = (status === "tomorrow") ? tomorrowStr : todayStr;
+
     // Determine League ID
     const foundLeague = LEAGUES.find(l => l.name === p.league) || LEAGUES[0];
 
@@ -860,6 +969,7 @@ function generateFullMatchesList(): any[] {
       time,
       minute,
       status,
+      date: matchDate,
       league: p.league,
       leagueId: foundLeague.id,
       logoHome: p.homeId === "101" ? "🔴⚫" : p.homeId === "102" ? "🟢" : p.homeId === "103" ? "🇾" : p.homeId === "104" ? "👑" : "⚽",
@@ -1002,12 +1112,177 @@ function normalizeLiveScoreMatch(raw: any, statusTypeFallback?: "live" | "today"
   };
 }
 
+// --- FOOTBALL-DATA.ORG SERVICES ---
+const lastConfiguredKeys = {
+  apiKey: "",
+  apiFootballKey: "",
+  apiKeyTheOdds: "",
+  footballDataToken: ""
+};
+
+let footballDataCache: any[] = [];
+let lastFootballDataFetchTime = 0;
+
+function normalizeFootballDataMatch(raw: any): any {
+  if (!raw) return null;
+  const id = `fd_${raw.id}`;
+  
+  // Extract names and crests safely
+  const homeTeam = raw.homeTeam?.shortName || raw.homeTeam?.name || "Time de Casa";
+  const awayTeam = raw.awayTeam?.shortName || raw.awayTeam?.name || "Time de Fora";
+  const homeTeamId = String(raw.homeTeam?.id || "fd_home_101");
+  const awayTeamId = String(raw.awayTeam?.id || "fd_away_105");
+  
+  const league = raw.competition?.name || "Campeonato Geral";
+  const leagueId = String(raw.competition?.id || "1");
+
+  const rawStatus = String(raw.status || "").toUpperCase();
+  let status: "live" | "today" | "tomorrow" | "finished" = "today";
+  if (rawStatus === "FINISHED" || rawStatus === "AWARDED") {
+    status = "finished";
+  } else if (rawStatus === "IN_PLAY" || rawStatus === "PAUSED" || rawStatus === "LIVE") {
+    status = "live";
+  } else {
+    // Check matching date to categorize correctly
+    const matchDateStr = raw.utcDate?.split("T")[0];
+    const todayStr = new Date().toISOString().split("T")[0];
+    const tomorrowStr = new Date(Date.now() + 86400000).toISOString().split("T")[0];
+    if (matchDateStr === tomorrowStr) {
+      status = "tomorrow";
+    } else if (matchDateStr === todayStr) {
+      status = "today";
+    } else if (matchDateStr && matchDateStr < todayStr) {
+      status = "finished";
+    }
+  }
+
+  // Score
+  let score = "";
+  if (raw.score && raw.score.fullTime) {
+    const h = raw.score.fullTime.home;
+    const a = raw.score.fullTime.away;
+    if (h !== null && a !== null) {
+      score = `${h} - ${a}`;
+    }
+  }
+
+  // Minute
+  let minute = "";
+  if (status === "live") {
+    minute = "45'";
+  }
+
+  // Date and Time
+  const date = raw.utcDate?.split("T")[0] || new Date().toISOString().split("T")[0];
+  let time = raw.utcDate?.split("T")[1]?.substring(0, 5) || "16:00";
+  if (status === "live") {
+    time = "AO VIVO";
+  } else if (status === "finished") {
+    time = "Encerrado";
+  }
+
+  // Odds
+  const r = seedRandom(id);
+  const winH = parseFloat((1.3 + r() * 3).toFixed(2));
+  const draw = parseFloat((2.8 + r() * 2).toFixed(2));
+  const winA = parseFloat((1.5 + r() * 4).toFixed(2));
+
+  const odds = {
+    home: winH,
+    draw: draw,
+    away: winA,
+    over05: parseFloat((1.05 + r() * 0.15).toFixed(2)),
+    under05: parseFloat((4.00 + r() * 5.00).toFixed(2)),
+    over15: parseFloat((1.20 + r() * 0.35).toFixed(2)),
+    under15: parseFloat((2.40 + r() * 1.50).toFixed(2)),
+    over25: parseFloat((1.55 + r() * 0.80).toFixed(2)),
+    under25: parseFloat((1.70 + r() * 0.90).toFixed(2)),
+    over35: parseFloat((2.20 + r() * 1.50).toFixed(2)),
+    under35: parseFloat((1.30 + r() * 0.40).toFixed(2)),
+    btts_yes: parseFloat((1.50 + r() * 0.60).toFixed(2)),
+    btts_no: parseFloat((1.60 + r() * 0.70).toFixed(2)),
+    handicap_asian_home: parseFloat((1.85 + r() * 0.30).toFixed(2)),
+    handicap_asian_away: parseFloat((1.85 + r() * 0.30).toFixed(2)),
+    handicap_asian_value: "-0.5"
+  };
+
+  return {
+    id,
+    homeTeam,
+    awayTeam,
+    homeTeamId,
+    awayTeamId,
+    score,
+    time,
+    minute,
+    status,
+    league,
+    leagueId,
+    logoHome: raw.homeTeam?.crest || "⚽",
+    logoAway: raw.awayTeam?.crest || "⚽",
+    odds,
+    date
+  };
+}
+
+async function fetchFootballDataMatches(tokenToUse?: string) {
+  const token = tokenToUse || lastConfiguredKeys.footballDataToken || process.env.FOOTBALL_DATA_TOKEN || lastConfiguredKeys.apiKey;
+  if (!token) {
+    console.log("[FOOTBALL-DATA] No token provided or configured. Skipping background fetch.");
+    return null;
+  }
+  
+  try {
+    console.log(`[FOOTBALL-DATA] Fetching matches from api.football-data.org/v4/matches...`);
+    const response = await fetch("https://api.football-data.org/v4/matches", {
+      headers: {
+        "X-Auth-Token": token
+      }
+    });
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+    }
+    const data = await response.json();
+    if (data && data.matches) {
+      const normalized = data.matches.map((m: any) => normalizeFootballDataMatch(m)).filter(Boolean);
+      footballDataCache = normalized;
+      lastFootballDataFetchTime = Date.now();
+      console.log(`[FOOTBALL-DATA] Matches synchronization was successful! Loaded ${normalized.length} matches.`);
+      return normalized;
+    }
+  } catch (err: any) {
+    console.error("[FOOTBALL-DATA] Failed to fetch matches:", err.message || String(err));
+  }
+  return null;
+}
+
+// Background auto-refresh loop (Runs every 5 minutes / 300,000 ms) - Requirement 4
+setInterval(() => {
+  fetchFootballDataMatches().catch(err => {
+    console.error("[FOOTBALL-DATA] Background polling raised error:", err);
+  });
+}, 5 * 60 * 1000);
+
+// Initial loading delay trigger
+setTimeout(() => {
+  fetchFootballDataMatches().catch(err => {
+    console.error("[FOOTBALL-DATA] Initial fetch failed:", err);
+  });
+}, 5000);
+
 // ENDPOINT: Get live matches with auto-cache
 app.get("/api/live", async (req, res) => {
   const cacheKey = "livescore_realtime_live";
   const cached = getFromCache(cacheKey);
   if (cached) {
     return res.json(cached);
+  }
+
+  // If we have Football-Data matches synchronised, prefer them!
+  if (footballDataCache && footballDataCache.length > 0) {
+    const liveMatches = footballDataCache.filter(m => m.status === "live");
+    setToCache(cacheKey, liveMatches, 15000); // Short 15s cache
+    return res.json(liveMatches);
   }
 
   try {
@@ -1042,6 +1317,19 @@ app.get("/api/fixtures", async (req, res) => {
   const cached = getFromCache(cacheKey);
   if (cached) {
     return res.json(cached);
+  }
+
+  // If we have Football-Data matches synchronised, prefer them!
+  if (footballDataCache && footballDataCache.length > 0) {
+    let result = footballDataCache.filter(m => m.status === "today" || m.status === "tomorrow" || m.status === "live");
+    if (dateQuery) {
+      result = footballDataCache.filter(m => m.date === dateQuery);
+    }
+    if (leagueQuery && leagueQuery !== "all") {
+      result = result.filter(m => m.league.toLowerCase() === leagueQuery.toLowerCase() || m.leagueId === leagueQuery);
+    }
+    setToCache(cacheKey, result, 15000); // 15s cache
+    return res.json(result);
   }
 
   try {
@@ -1090,6 +1378,16 @@ app.get("/api/results", async (req, res) => {
   const cached = getFromCache(cacheKey);
   if (cached) {
     return res.json(cached);
+  }
+
+  // If we have Football-Data matches synchronised, prefer them!
+  if (footballDataCache && footballDataCache.length > 0) {
+    let result = footballDataCache.filter(m => m.status === "finished");
+    if (dateQuery) {
+      result = result.filter(m => m.date === dateQuery);
+    }
+    setToCache(cacheKey, result, 15000); // 15s cache
+    return res.json(result);
   }
 
   try {
